@@ -2,7 +2,7 @@ from ucimlrepo import fetch_ucirepo
 import pandas as pd
   
 # fetch dataset 
-student_performance = fetch_ucirepo(id=320) 
+student_performance = fetch_ucirepo(id=186) 
   
 # data (as pandas dataframes) 
 X = student_performance.data.features 
