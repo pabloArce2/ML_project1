@@ -1,19 +1,15 @@
-from ucimlrepo import fetch_ucirepo 
 import pandas as pd
-  
-# fetch dataset 
-student_performance = fetch_ucirepo(id=186) 
-  
-# data (as pandas dataframes) 
-X = student_performance.data.features 
-y = student_performance.data.targets 
+
+url = "https://www.hastie.su.domains/Datasets/SAheart.data"
+
+# Read like the R call (comma-sep, header row, first col = row names)
+df = pd.read_csv(url, sep=",", header=0, index_col=0, skipinitialspace=True)
+
+if df["famhist"].dtype != "O":  # numeric -> map to strings
+    df["famhist"] = df["famhist"].map({0: "Absent", 1: "Present"}).astype("category")
 
 
-# Show up to 200 rows/columns
-pd.set_option("display.max_rows", 200)       # show up to 200 rows
-pd.set_option("display.max_columns", None)   # show all columns
-pd.set_option("display.width", 1000)         # avoid line breaks
-pd.set_option("display.colheader_justify", "left")
+x = df.drop(columns=["chd"])
+y = pd.Categorical(df["chd"])
 
-print(X)
-#
+print(x)
