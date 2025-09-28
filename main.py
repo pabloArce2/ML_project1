@@ -28,10 +28,10 @@ scaler, pca, Xz, B, V, sing_vals = fit_pca(X, n_components=None)
 
 # Plots
 # (a) 3D cloud of first 3 original standardized dims + PC directions, and 2D scores
-plot_pc_lines_3d(Xz, V, K=2, elev=12, azim=-150)
+plot_pc_lines_3d(Xz, V, B, K=2, elev=12, azim=-150)
 
 # (b) 2D scores (PC1 vs PC2) colored by CHD
 plot_scores_2d(B, y=y, title="SAheart: PC1 vs PC2 (colored by CHD)")
 
 # (c) Explained variance
-plot_explained_variance(pca, M_label="SAheart PCA")
+plot_explained_variance(df, pca, M_label="SAheart PCA")
