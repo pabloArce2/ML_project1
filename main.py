@@ -18,8 +18,7 @@ y = pd.Categorical(df["chd"])
 #histogram_overlay_by_chd(df, features=None, ncols=3)
 
 #boxplot(df)
-
-#scatter_matrix_subset(df, [0,1,2,3,8], label="chd", bins=20, alpha=0.5, s=15)
+scatter_matrix_subset(df, [0,1,2,3,8], label="chd", bins=20, alpha=0.5, s=15)
 scatter_3d_combinations(df, features=[0,1,2,3,8], label_col="chd", use_indices=True, ncols=2, s=10)
 
 X, y, feature_names = make_Xy(df, target="chd")
