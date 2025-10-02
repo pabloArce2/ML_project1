@@ -6,6 +6,21 @@ import numpy as np
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 (required for 3D)
 import itertools
 
+# mapping of features -> (title, x-axis label)
+FEATURE_LABELS = {
+    "sbp": ("Systolic blood pressure", "mmHg"),
+    "tobacco": ("Cumulative tobacco consumption", "kg in a lifetime"),
+    "ldl": ("Low-density lipoprotein cholesterol", "mmol/L"),
+    "adiposity": ("Adiposity index", "correlated with BMI"),
+    "famhist": ("Family history of heart disease", "Present/Absent"),
+    "typea": ("Type-A behavior score", "Bortner’s questionnaire"),
+    "obesity": ("Obesity index", "equivalent to BMI"),
+    "alcohol": ("Current alcohol consumption", "g/day"),
+    "age": ("Age at onset", "years"),
+    "chd": ("Coronary heart disease", "Yes/No"),
+}
+
+
 def histogram(
     df,
     bins=20,
@@ -18,21 +33,29 @@ def histogram(
     n = len(num_df.columns)
     nrows = int(np.ceil(n / ncols))
 
-    fig, axs = plt.subplots(nrows, ncols, figsize=(4*ncols, 3*nrows), sharey=False)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4*ncols, 3*nrows), sharey=False, gridspec_kw={"wspace": 0.35, "hspace": 0.75},)
     axs = axs.flatten()
 
     for j, col in enumerate(num_df.columns):
         ax = axs[j]
+
+        # Select labels
+        if col in FEATURE_LABELS:
+            short_title, xlab = FEATURE_LABELS[col]
+        else:
+            short_title, xlab = col, "Value"
+
+        # Plot depending on `by_chd`
         if by_chd == "split" and "chd" in df.columns:
             ax.hist(
                 df.loc[df["chd"] == 0, col],
-                bins=bins, edgecolor="black", alpha=0.6, label="chd=0"
+                bins=bins, edgecolor="black", alpha=0.6, label="CHD No"
             )
             ax.hist(
                 df.loc[df["chd"] == 1, col],
-                bins=bins, edgecolor="black", alpha=0.6, label="chd=1"
+                bins=bins, edgecolor="black", alpha=0.6, label="CHD Yes"
             )
-            ax.legend(fontsize=8)
+            ax.legend(fontsize=6)
         elif by_chd in (0, 1) and "chd" in df.columns:
             ax.hist(
                 df.loc[df["chd"] == by_chd, col],
@@ -41,8 +64,9 @@ def histogram(
         else:
             ax.hist(df[col], bins=bins, edgecolor="black")
 
-        ax.set_title(col, fontsize=10, pad=10)
-        ax.set_xlabel("Value")
+        # Set axis labels
+        ax.set_title(short_title, fontsize=10, pad=6)
+        ax.set_xlabel(xlab)
         ax.set_ylabel("Frequency")
 
     # remove empty plots
@@ -53,22 +77,22 @@ def histogram(
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.show()
 
+
+
 def histogram_overlay_by_chd(
     df,
-    features=None,        # None = all numeric except 'chd'; or list of names/indices
+    features=None,
     bins=20,
     ncols=3,
     alpha=0.55,
     title="Distributions by CHD (proportion-normalized)",
-    fmt="{:.2f}",         # number formatting for mean/std
+    fmt="{:.2f}",
 ):
     if "chd" not in df.columns:
         raise ValueError("Column 'chd' not found in DataFrame.")
 
-    # numeric features only (exclude target)
     num_df = df.select_dtypes(include=np.number).drop(columns=["chd"], errors="ignore")
 
-    # resolve features arg (names or integer indices)
     if features is None:
         cols = list(num_df.columns)
     else:
@@ -84,7 +108,7 @@ def histogram_overlay_by_chd(
         nrows, ncols,
         figsize=(4*ncols, 3.5*nrows),
         sharex=False, sharey=False,
-        gridspec_kw={"wspace": 0.35, "hspace": 0.75},  # more vertical spacing
+        gridspec_kw={"wspace": 0.35, "hspace": 0.75},
     )
     axs = np.atleast_1d(axs).ravel()
 
@@ -99,45 +123,43 @@ def histogram_overlay_by_chd(
         x0 = df.loc[mask0, col].dropna().values
         x1 = df.loc[mask1, col].dropna().values
 
-        # shared bin edges so bars align
         combined = np.concatenate([x0, x1]) if (x0.size and x1.size) else (x0 if x0.size else x1)
         bin_edges = np.histogram_bin_edges(combined, bins=bins) if combined.size else bins
 
-        # per-group weights (proportions)
         w0 = np.full_like(x0, 1.0 / n0, dtype=float) if x0.size else None
         w1 = np.full_like(x1, 1.0 / n1, dtype=float) if x1.size else None
 
-        h0 = ax.hist(x0, bins=bin_edges, weights=w0, edgecolor="black", alpha=alpha, label="chd=0")
-        h1 = ax.hist(x1, bins=bin_edges, weights=w1, edgecolor="black", alpha=alpha, label="chd=1")
-        text = col
-        ax.set_title(text, fontsize=12, pad=20)  # multiline title above plot
-        # ---- mean & std annotations per group (above graph) ----
-     
+        ax.hist(x0, bins=bin_edges, weights=w0, edgecolor="black", alpha=alpha, label="chd=0")
+        ax.hist(x1, bins=bin_edges, weights=w1, edgecolor="black", alpha=alpha, label="chd=1")
+
+        # get labels (short title + x-axis)
+        if col in FEATURE_LABELS:
+            short_title, xlab = FEATURE_LABELS[col]
+        else:
+            short_title, xlab = col, "Value"
+
+        ax.set_title(short_title, fontsize=10, pad=18)
+        ax.set_xlabel(xlab)   # <-- units/info now on x-axis
+        ax.set_ylabel("Proportion")
+
         if x0.size:
             m0, s0 = np.mean(x0), np.std(x0, ddof=1) if x0.size > 1 else 0.0
             ax.text(0.5, 1.08, f"0: μ={fmt.format(m0)}, σ={fmt.format(s0)}",
                     transform=ax.transAxes, ha="center", va="bottom", fontsize=6)
-
         if x1.size:
             m1, s1 = np.mean(x1), np.std(x1, ddof=1) if x1.size > 1 else 0.0
             ax.text(0.5, 1.02, f"1: μ={fmt.format(m1)}, σ={fmt.format(s1)}",
                     transform=ax.transAxes, ha="center", va="bottom", fontsize=6)
 
-  
-
-        ax.set_xlabel("Value")
-        ax.set_ylabel("Proportion")
         ax.grid(axis="y", alpha=0.3)
         ax.legend(fontsize=8, frameon=False)
 
-    # remove unused panels
     for k in range(j + 1, len(axs)):
         fig.delaxes(axs[k])
 
     fig.suptitle(title, fontsize=14, y=0.995)
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
-
 
 
 def boxplot(df, max_cols=10, ncols=3, title="Boxplots of SAheart (numeric)"):
@@ -147,7 +169,7 @@ def boxplot(df, max_cols=10, ncols=3, title="Boxplots of SAheart (numeric)"):
     n = len(cols)
     nrows = int(np.ceil(n / ncols))
 
-    fig, axs = plt.subplots(nrows, ncols, figsize=(4*ncols, 5*nrows))
+    fig, axs = plt.subplots(nrows, ncols, figsize=(4*ncols, 5*nrows), gridspec_kw={"wspace": 0.05, "hspace": 0.25})
     axs = axs.ravel()
 
     for i, col in enumerate(cols):
@@ -296,7 +318,7 @@ def scatter_3d_combinations(
 
     # If too many combos, expand rows up to 3 per page before paginating
     while max_per_fig < min(nplots, 6) and nrows < 3:
-        nrows += 1
+        ncols += 1
         max_per_fig = ncols * nrows
 
     # Iterate in pages
@@ -314,7 +336,7 @@ def scatter_3d_combinations(
                 )
             ax.set_xlabel(a); ax.set_ylabel(b); ax.set_zlabel(c)
             ax.view_init(elev=elev, azim=azim)
-            ax.set_title(f"{title_prefix}{a}, {b}, {c}", fontsize=10, pad=10)
+            ax.set_title(f"{title_prefix}{a}, {b}, {c}", fontsize=10, pad=0)
 
             # Put legend only on the last subplot of the page
             if idx == len(page_combos):

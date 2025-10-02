@@ -115,3 +115,13 @@ def plot_explained_variance(df, pca, M_label=None):
         fig.suptitle(M_label)
     plt.tight_layout()
     plt.show()
+    
+    if hasattr(pca, "components_"):
+        feature_names = df.select_dtypes(include=np.number).drop(columns=["chd"], errors="ignore").columns
+        comps = pca.components_
+        for i, comp in enumerate(comps, start=1):
+            order = np.argsort(np.abs(comp))[::-1]
+            top = order[:8]   # top 8 features
+            print(f"\nPC{i}: top features")
+            for j in top:
+                print(f"  {feature_names[j]:<12} {comp[j]: .3f}")
