@@ -1,0 +1,42 @@
+[
+  {
+    "model": "logistic_regression",
+    "description": "Standardised features with L2-regularised logistic regression sweeping \u03bb.",
+    "param_name": "lambda",
+    "param_grid": [
+      1e-05,
+      0.0017782794100389228,
+      0.31622776601683794,
+      56.23413251903491,
+      10000.0
+    ],
+    "mean_accuracy": [
+      0.7316017316017316,
+      0.7316017316017316,
+      0.7316017316017316,
+      0.7207792207792209,
+      0.7099567099567099
+    ],
+    "mean_log_loss": [
+      0.5334850871742747,
+      0.5334821516822433,
+      0.5329903919477298,
+      0.5570013148937165,
+      0.6891698083541679
+    ],
+    "best_param": 1e-05,
+    "best_accuracy": 0.7316017316017316,
+    "best_log_loss": 0.5334850871742747,
+    "feature_names": [
+      "sbp",
+      "tobacco",
+      "ldl",
+      "adiposity",
+      "typea",
+      "obesity",
+      "alcohol",
+      "age",
+      "famhist_1"
+    ]
+  }
+]
