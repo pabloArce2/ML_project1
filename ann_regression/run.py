@@ -107,25 +107,38 @@ def nested_cv_ann(
     Two-level CV for ANN:
       - Outer loop: split data into train/test.
       - Inner loop: choose (h*, alpha*) by inner-CV on the outer-train split.
-    Returns a list of dicts with: outer_fold, h_star, alpha_star, Etest_ann, Etest_baseline.
-    (Error = mean squared error per observation, as required by the project.) 
+    Saves:
+      - performance_by_h_alpha.csv : all inner-CV results (for plotting)
+    Returns:
+      - List of dicts with outer_fold, h_star, alpha_star, Etest_ann, Etest_baseline
     """
     outer = KFold(n_splits=n_outer, shuffle=True, random_state=random_state)
-    rows = []
+
+    results = []        # stores final outer test performance
+    inner_records = []  # stores all inner-CV combinations for plotting
 
     for fold_idx, (tr_idx, te_idx) in enumerate(outer.split(X), start=1):
         X_tr, X_te = X.iloc[tr_idx], X.iloc[te_idx]
-        y_tr, y_te = y[tr_idx], y[te_idx] if y.ndim == 1 else (y[tr_idx], y[te_idx])
+        y_tr, y_te = (y[tr_idx], y[te_idx]) if y.ndim == 1 else (y[tr_idx], y[te_idx])
 
-        #selection of (h*, alpha*)
+        # --- inner loop: select (h*, alpha*) ---
         best_h, best_a, best_cv = None, None, np.inf
         for h in h_grid:
             for a in alpha_grid:
                 cv = inner_cv_mse(X_tr, y_tr, h=h, alpha=a, n_splits=n_inner, random_state=random_state)
+
+                # record all tested pairs for plotting
+                inner_records.append({
+                    "outer_fold": fold_idx,
+                    "h": h,
+                    "alpha": a,
+                    "inner_cv_mse": cv,
+                })
+
                 if cv < best_cv:
                     best_cv, best_h, best_a = cv, h, a
 
-        #train final model with (h*, a*) on outer-train and evaluate on outer-test
+        # --- train final model on outer-train with (h*, a*) and evaluate ---
         model = build_ann_pipeline(h=best_h, alpha=best_a, random_state=random_state)
         model.fit(X_tr, y_tr)
         y_pred = model.predict(X_te)
@@ -134,13 +147,15 @@ def nested_cv_ann(
             y_te_eval = y_te.ravel()
         else:
             y_te_eval = y_te
+
         Etest_ann = float(mean_squared_error(y_te_eval, y_pred))
 
-        #baseline on same outer split (predict mean of y in training set)
+        # --- baseline on same outer split ---
         y_mean = float(np.mean(y_tr if y_tr.ndim == 1 else y_tr.ravel()))
         Etest_baseline = float(np.mean((y_te_eval - y_mean) ** 2))
 
-        rows.append({
+        # store final outer results
+        results.append({
             "outer_fold": fold_idx,
             "h_star": best_h,
             "alpha_star": best_a,
@@ -148,7 +163,13 @@ def nested_cv_ann(
             "Etest_baseline": Etest_baseline,
         })
 
-    return rows
+        print(f"[fold {fold_idx}] best_h={best_h}, best_alpha={best_a}, testMSE={Etest_ann:.4f}")
+
+    # --- save inner-CV results for plotting ---
+    pd.DataFrame(inner_records).to_csv(RESULTS_DIR / "performance_by_h_alpha.csv", index=False)
+
+    return results
+
 
 def fit_and_save_final_ann(
     X_df: pd.DataFrame,
@@ -280,6 +301,27 @@ def main():
         print(f"\n[ok] Final model saved — h*={summary['h_star']}, α*={summary['alpha_star']}, cv_mse={summary['cv_mse']:.4f}")
         print(f"Model path: {summary['model_path']}")
 
+        # --- create and save performance vs α plot ---
+    perf_path = RESULTS_DIR / "performance_by_h_alpha.csv"
+    if perf_path.exists():
+        df = pd.read_csv(perf_path)
+        avg = df.groupby(["h", "alpha"], as_index=False)["inner_cv_mse"].mean()
+
+        plt.figure(figsize=(8,6))
+        for h, group in avg.groupby("h"):
+            plt.plot(group["alpha"], group["inner_cv_mse"], marker="o", label=f"h={h}")
+
+        plt.xscale("log")
+        plt.xlabel("Regularization α (log scale)")
+        plt.ylabel("Mean Inner-CV MSE")
+        plt.title("ANN performance vs regularization (per hidden layer size)")
+        plt.legend()
+        plt.tight_layout()
+
+        out_path = RESULTS_DIR / "performance_by_h_alpha.png"
+        plt.savefig(out_path, dpi=300)
+        plt.close()
+        print(f"[ok] Saved performance plot → {out_path}")
 
 if __name__ == "__main__":
     main()
