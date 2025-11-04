@@ -1,4 +1,4 @@
-# ann_regression/inference.py
+
 """
 Load a saved ANN regression model and run predictions on a CSV of (raw or engineered) features.
 
@@ -28,7 +28,7 @@ DEFAULT_RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
 
 def load_artefacts(results_dir: Path, setting: str):
-    """Load model + metadata for a given setting (e.g., 'ldl_only')."""
+    """Load model + metadata for a given setting."""
     folder = results_dir / setting
     model_path = folder / "model.joblib"
     feat_path = folder / "feature_names.json"
@@ -55,7 +55,7 @@ def prepare_features(df: pd.DataFrame, feature_names: List[str]) -> pd.DataFrame
       3) drop any extra columns not seen during training.
       4) order columns exactly as in feature_names.
     """
-    # expand categoricals to one-hot (consistent with training which used get_dummies(drop_first=True))
+    # expand categoricals to one-hot encoding
     df_enc = pd.get_dummies(df, drop_first=True, dtype=float)
 
     # ensure every training feature exists
@@ -106,7 +106,7 @@ def main():
     # attach predictions to original input order
     out_df = pd.concat([df_in.reset_index(drop=True), preds_df], axis=1)
 
-    # (optional) quick score if ground truth present
+    # quick score if ground truth present
     y_true = maybe_extract_ground_truth(df_in, targets)
     if y_true is not None:
         if y_true.ndim > 1 and y_true.shape[1] == 1:
@@ -116,7 +116,7 @@ def main():
 
     # write output
     if args.output is None:
-        # default: results/<setting>/inference_predictions.csv
+        
         out_path = folder / "inference_predictions.csv"
     else:
         out_path = args.output

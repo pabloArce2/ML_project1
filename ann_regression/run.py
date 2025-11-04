@@ -17,12 +17,12 @@ import matplotlib.pyplot as plt
 from joblib import dump
 import argparse 
 
-# Keep same locations/URLs as teammate for consistency
+
 DATA_URL = "https://www.hastie.su.domains/Datasets/SAheart.data"
 OUTPUT_DIR = Path(__file__).resolve().parent
 RESULTS_DIR = OUTPUT_DIR / "results"
 
-# ---- Same TargetSetup as teammate ----
+
 @dataclass
 class TargetSetup:
     name: str
@@ -58,7 +58,7 @@ def load_saheart(url: str = DATA_URL) -> pd.DataFrame:
 
 def make_design_matrix(df: pd.DataFrame, target_cols: Sequence[str]) -> Tuple[pd.DataFrame, np.ndarray]:
     drop_cols = set(target_cols)
-    drop_cols.add("chd")  # keep consistent with teammate’s design matrix
+    drop_cols.add("chd")  
     X_df = df.drop(columns=list(drop_cols), errors="ignore")
     X_df = pd.get_dummies(X_df, drop_first=True, dtype=float)
 
@@ -117,7 +117,7 @@ def nested_cv_ann(
         X_tr, X_te = X.iloc[tr_idx], X.iloc[te_idx]
         y_tr, y_te = y[tr_idx], y[te_idx] if y.ndim == 1 else (y[tr_idx], y[te_idx])
 
-        # --- inner selection of (h*, alpha*)
+        #selection of (h*, alpha*)
         best_h, best_a, best_cv = None, None, np.inf
         for h in h_grid:
             for a in alpha_grid:
@@ -125,7 +125,7 @@ def nested_cv_ann(
                 if cv < best_cv:
                     best_cv, best_h, best_a = cv, h, a
 
-        # --- train final model with (h*, a*) on outer-train and evaluate on outer-test
+        #train final model with (h*, a*) on outer-train and evaluate on outer-test
         model = build_ann_pipeline(h=best_h, alpha=best_a, random_state=random_state)
         model.fit(X_tr, y_tr)
         y_pred = model.predict(X_te)
@@ -136,8 +136,7 @@ def nested_cv_ann(
             y_te_eval = y_te
         Etest_ann = float(mean_squared_error(y_te_eval, y_pred))
 
-        # --- baseline on same outer split (predict mean of y in training set), per spec
-        # (Baseline definition matches the project brief.) :contentReference[oaicite:0]{index=0}
+        #baseline on same outer split (predict mean of y in training set)
         y_mean = float(np.mean(y_tr if y_tr.ndim == 1 else y_tr.ravel()))
         Etest_baseline = float(np.mean((y_te_eval - y_mean) ** 2))
 
@@ -173,7 +172,7 @@ def fit_and_save_final_ann(
     X = X_df.values
     feature_names = list(X_df.columns)
 
-    # ---- simple CV selection on the full data (not nested) to get a single (h*, alpha*)
+    # simple CV selection on the full data (not nested) to get a single (h*, alpha*)
     best_h, best_a, best_cv = None, None, np.inf
     for h in h_grid:
         for a in alpha_grid:
@@ -181,11 +180,11 @@ def fit_and_save_final_ann(
             if cv < best_cv:
                 best_cv, best_h, best_a = cv, h, a
 
-    # ---- fit final model on all data
+    # fit final model on all data
     model = build_ann_pipeline(h=best_h, alpha=best_a, random_state=random_state)
     model.fit(X, y)
 
-    # ---- persist artefacts
+    # persist artefacts
     result_dir = results_dir / setup.name
     result_dir.mkdir(parents=True, exist_ok=True)
 
@@ -200,7 +199,7 @@ def fit_and_save_final_ann(
     with targets_path.open("w", encoding="utf-8") as handle:
         json.dump(list(setup.targets), handle, indent=2)
 
-    # ---- optional: save train predictions
+    # save train predictions
     if save_predictions:
         preds = model.predict(X)
         if preds.ndim == 1:
@@ -210,7 +209,7 @@ def fit_and_save_final_ann(
         out_df = pd.concat([actual_df.add_suffix("_actual"), preds_df.add_suffix("_pred")], axis=1)
         out_df.to_csv(result_dir / "predictions.csv", index=True)
 
-    # ---- optional: run custom inference from a CSV of raw features (columns need to match/align)
+    #run custom inference from a CSV of raw features (columns need to match/align)
     if inference_df is not None:
         inf_features = inference_df.copy()
         # align columns to training features (fill missing with 0)
@@ -252,7 +251,7 @@ def main():
     setup = next(s for s in TARGET_SETUPS if s.name == args.setting)
     X_df, y = make_design_matrix(df, setup.targets)
 
-    # 2) nested CV summary table (per project spec for Regression part b) 
+    # 2) nested CV summary table  
     rows = nested_cv_ann(
         X=X_df, y=y,
         h_grid=args.h_grid, alpha_grid=args.alpha_grid,
@@ -267,7 +266,7 @@ def main():
     out.to_csv(RESULTS_DIR / f"{setup.name}_nested_cv_ann.csv", index=False)
  
 
-    # 3) optional: fit + save final model/artefacts for inference (model.joblib, feature_names.json, targets.json)
+    # 3) fit + save final model/artefacts for inference (model.joblib, feature_names.json, targets.json)
     if args.fit_final:
         summary = fit_and_save_final_ann(
             X_df=X_df, y=y, setup=setup,
