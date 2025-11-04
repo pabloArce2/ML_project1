@@ -3,6 +3,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
+import matplotlib.pyplot as plt
 
 import numpy as np
 import pandas as pd
@@ -64,6 +65,22 @@ def make_target(df: pd.DataFrame) -> np.ndarray:
         raise ValueError(f"Target '{TARGET_NAME}' not found in dataset columns: {list(df.columns)}")
     return df[TARGET_NAME].to_numpy(dtype=float)
 
+def plot_fold_mse(
+    fold_mse,
+    output_path: Path | str = RESULTS_DIR / "mean_baseline_regression" / "baseline_regression_fold_mse.png",
+) -> None:
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    folds = np.arange(1, len(fold_mse) + 1)
+    plt.plot(folds, fold_mse, marker='o', linestyle='-', color='b')
+    plt.title('Baseline Regression: MSE across folds')
+    plt.xlabel('Fold Number')
+    plt.ylabel('Mean Squared Error (MSE)')
+    plt.grid(True)
+
+    # Save the plot to a file
+    plt.savefig(output_path, dpi=300)
+    plt.close() 
 
 def cross_validate_mean_baseline(y: np.ndarray, n_splits: int = 10, random_state: int = 42) -> Tuple[np.ndarray, float, float]:
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
@@ -107,6 +124,9 @@ def run(args: argparse.Namespace) -> None:
 
     model = MeanBaseline().fit(y)
     global_mean = model.mean_
+
+    plot_fold_mse(fold_mse)
+
 
     # Save CV metrics
     result_dir = RESULTS_DIR / "mean_baseline_regression"
