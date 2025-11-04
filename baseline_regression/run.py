@@ -53,7 +53,7 @@ class MeanBaseline:
 
 
 def load_saheart(url: str = DATA_URL) -> pd.DataFrame:
-    # Same loading as classification, index is an id column
+    # index is an id column
     df = pd.read_csv(url, sep=",", header=0, index_col=0, skipinitialspace=True)
     # No transformations needed for a mean baseline
     return df
@@ -105,13 +105,15 @@ def run(args: argparse.Namespace) -> None:
         y, n_splits=args.folds, random_state=args.random_state
     )
 
-    # Fit on full data to get the final global mean
     model = MeanBaseline().fit(y)
     global_mean = model.mean_
 
     # Save CV metrics
     result_dir = RESULTS_DIR / "mean_baseline_regression"
     cv_path = result_dir / "cv_metrics.csv"
+
+    result_dir.mkdir(parents=True, exist_ok=True)
+
     pd.DataFrame({"fold": np.arange(1, len(fold_mse) + 1), "mse": fold_mse}).to_csv(cv_path, index=False)
 
     # Optionally save in-sample predictions (useful to sanity check)
