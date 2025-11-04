@@ -1,0 +1,24 @@
+# Baseline Regression (Mean Predictor)
+
+This module mirrors the structure of your `logistic_regression` project but implements a **baseline regression** for `ldl`: a model that always predicts the training mean of the target and is evaluated with **MSE**.
+
+## How to run
+
+```bash
+# 1) Evaluate baseline with 10-fold CV and save artefacts
+python -m baseline_regression.run --folds 10 --save-predictions
+
+# 2) Produce constant predictions for a CSV (any columns)
+python -m baseline_regression.inference  # writes manual_inference.csv using a dummy row
+# or
+python - <<'PY'
+from baseline_regression.inference import main
+main(input_csv="path/to/your_rows.csv", output_csv="preds.csv")
+PY
+```
+
+## Outputs (under `baseline_regression/results/mean_baseline_regression/`)
+- `cv_metrics.csv` — MSE per fold.
+- `predictions.csv` — in-sample `actual` vs `predicted` (if `--save-predictions`).
+- `model.joblib` — contains the learned global mean for `ldl`.
+- `summary.json` — quick summary with mean/std MSE.
