@@ -77,7 +77,10 @@ def build_ann_pipeline(h: int, alpha: float, random_state: int = 0) -> Pipeline:
         ("mlp", MLPRegressor(
             hidden_layer_sizes=(h,),
             alpha=alpha,
-            max_iter=6000,
+            max_iter=10000,
+            early_stopping=True,
+            n_iter_no_change=20,
+            tol=1e-4,
             random_state=random_state,
         )),
     ])
