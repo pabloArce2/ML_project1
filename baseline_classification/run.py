@@ -45,7 +45,7 @@ class MajorityClassBaseline:
         self.frac_: float | None = None
 
     def fit(self, y: np.ndarray) -> "MajorityClassBaseline":
-        # y may be {0,1} or strings; ensure integers 0/1
+        #ensure integers 0/1
         y = np.asarray(y)
         # handle ties deterministically: pick the smaller class label on tie
         values, counts = np.unique(y, return_counts=True)
@@ -105,7 +105,7 @@ def save_artifacts(result_dir: Path, result: CVResult) -> None:
     model_path = result_dir / "model.joblib"
     dump({"type": "majority_baseline", "target": TARGET_NAME,
           "majority_class": result.majority_class, "majority_frac": result.majority_frac}, model_path)
-    # Targets file to mirror other modules
+    # Targets file 
     targets_path = result_dir / "targets.json"
     targets_path.write_text(json.dumps([TARGET_NAME], indent=2))
     # Summary JSON
@@ -134,7 +134,7 @@ def run(args: argparse.Namespace) -> None:
     result_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame({"fold": np.arange(1, len(fold_acc) + 1), "accuracy": fold_acc}).to_csv(cv_path, index=False)
 
-    # Optionally save in-sample predictions (sanity check)
+    # Optionally save in-sample predictions 
     if args.save_predictions:
         preds = model.predict(len(y))
         pred_path = result_dir / "predictions.csv"
