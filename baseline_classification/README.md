@@ -1,4 +1,4 @@
-# 🧩 Baseline Classification — Majority Class Model
+# Baseline Classification
 
 This module implements a **baseline classifier** for the South African Heart Disease dataset.  
 It always predicts the **most frequent class** (`chd`) observed in the training set.  
@@ -7,7 +7,7 @@ such as logistic regression or neural networks.
 
 ---
 
-## 📘 Description
+## Description
 
 - **Target:** `chd` (presence of coronary heart disease)
 - **Baseline approach:** Majority class prediction
@@ -17,7 +17,7 @@ such as logistic regression or neural networks.
 
 ---
 
-## ⚙️ Files
+## Files
 
 | File | Description |
 |------|--------------|
@@ -27,11 +27,11 @@ such as logistic regression or neural networks.
 
 ---
 
-## 🚀 Usage
+## Usage
 
-### 1️⃣ Train and evaluate baseline
+### Train and evaluate baseline
 ```bash
-/Users/carlossainz/miniconda3/envs/dtuML/bin/python -m baseline_classification.run   --folds 10 --save-predictions
+python -m baseline_classification.run   --folds 10 --save-predictions
 ```
 
 This will:
@@ -45,18 +45,18 @@ This will:
 
 ---
 
-### 2️⃣ Inference on new data
+### Inference on new data
 Once the model is trained, you can run inference on new CSV files:
 
 ```bash
-/Users/carlossainz/miniconda3/envs/dtuML/bin/python -m baseline_classification.inference   --input path/to/new_data.csv   --output baseline_classification/results/majority_baseline_classification/preds_on_new_data.csv
+python -m baseline_classification.inference   --input path/to/new_data.csv   --output baseline_classification/results/majority_baseline_classification/preds_on_new_data.csv
 ```
 
 If the CSV contains the true `chd` column, the script will also print the accuracy.
 
 ---
 
-## 📊 Output artefacts
+## Output artefacts
 
 | File | Description |
 |------|--------------|
@@ -69,15 +69,14 @@ If the CSV contains the true `chd` column, the script will also print the accura
 
 ---
 
-## 🧠 Notes
+## Notes
 
-- This baseline provides a simple sanity check:  
+- This baseline provides a simple check:  
   any real classifier should outperform it.
-- Accuracy is the main metric; F1 or AUC may be used in later models for richer comparison.
 
 ---
 
-## 🧩 Example Output
+## Example Output
 
 ```
 === Majority-Class Baseline (Classification) ===
@@ -86,7 +85,3 @@ Global majority class for 'chd': 0 (fraction=0.65)
 Saved CV metrics to baseline_classification/results/majority_baseline_classification/cv_metrics.csv
 ```
 
----
-
-**Authors:** Carlos Sainz & Team  
-**Course:** 02452 – Machine Learning (DTU)
