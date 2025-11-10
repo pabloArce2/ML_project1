@@ -18,6 +18,7 @@ PY
 ```
 
 ## Outputs (under `baseline_regression/results/mean_baseline_regression/`)
+
 - `cv_metrics.csv` — MSE per fold.
 - `predictions.csv` — in-sample `actual` vs `predicted` (if `--save-predictions`).
 - `model.joblib` — contains the learned global mean for `ldl`.
