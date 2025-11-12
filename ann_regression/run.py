@@ -66,7 +66,7 @@ def make_design_matrix(df: pd.DataFrame, target_cols: Sequence[str]) -> Tuple[pd
     y = y_df.values if len(target_cols) > 1 else y_df.values.ravel()
     return X_df, y
 
-def build_ann_pipeline(h: int, alpha: float, random_state: int = 0) -> Pipeline:
+def build_ann_pipeline(h: int, alpha: float, random_state: int = 42) -> Pipeline:
     """
     Standardize features, then 1-hidden-layer MLP for regression.
     - h: hidden units (complexity parameter)
@@ -87,7 +87,7 @@ def build_ann_pipeline(h: int, alpha: float, random_state: int = 0) -> Pipeline:
 
 
 def inner_cv_mse(X: pd.DataFrame, y: np.ndarray, h: int, alpha: float,
-                 n_splits: int = 5, random_state: int = 0) -> float:
+                 n_splits: int = 5, random_state: int = 42) -> float:
     """
     Mean CV MSE for a single (h, alpha) using KFold.
     """
@@ -103,8 +103,8 @@ def nested_cv_ann(
     h_grid: Sequence[int],
     alpha_grid: Sequence[float],
     n_outer: int = 10,
-    n_inner: int = 5,
-    random_state: int = 0,
+    n_inner: int = 10,
+    random_state: int = 42,
 ):
     """
     Two-level CV for ANN:
@@ -185,7 +185,7 @@ def fit_and_save_final_ann(
     save_predictions: bool = False,
     inference_df: Optional[pd.DataFrame] = None,
     inference_output: Optional[Path] = None,
-    random_state: int = 0,
+    random_state: int = 42,
 ) -> dict:
     """
     Select (h*, alpha*) via CV on the full dataset, fit final ANN, and persist artefacts:
@@ -279,7 +279,7 @@ def main():
     rows = nested_cv_ann(
         X=X_df, y=y,
         h_grid=args.h_grid, alpha_grid=args.alpha_grid,
-        n_outer=args.outer, n_inner=args.inner, random_state=0
+        n_outer=args.outer, n_inner=args.inner, random_state=42
     )
     out = pd.DataFrame(rows, columns=["outer_fold","h_star","alpha_star","Etest_ann","Etest_baseline"])
     print("\nTwo-level CV (ANN vs baseline) —", args.setting)
@@ -299,7 +299,7 @@ def main():
             results_dir=RESULTS_DIR,
             save_predictions=args.save_predictions,
             inference_df=None, inference_output=None,
-            random_state=0,
+            random_state=42,
         )
         print(f"\n[ok] Final model saved — h*={summary['h_star']}, α*={summary['alpha_star']}, cv_mse={summary['cv_mse']:.4f}")
         print(f"Model path: {summary['model_path']}")
