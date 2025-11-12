@@ -10,7 +10,7 @@ import pandas as pd
 from joblib import dump
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, log_loss
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -43,6 +43,10 @@ class ModelResult:
     best_param: float
     best_accuracy: float
     best_log_loss: float
+    train_accuracy: float
+    train_log_loss: float
+    test_accuracy: float
+    test_log_loss: float
     model: Pipeline
     feature_names: List[str]
 
@@ -57,6 +61,10 @@ class ModelResult:
             "best_param": self.best_param,
             "best_accuracy": self.best_accuracy,
             "best_log_loss": self.best_log_loss,
+            "train_accuracy": self.train_accuracy,
+            "train_log_loss": self.train_log_loss,
+            "test_accuracy": self.test_accuracy,
+            "test_log_loss": self.test_log_loss,
             "feature_names": self.feature_names,
         }
 
@@ -176,8 +184,10 @@ def save_model_artifacts(
 
 
 def run_single_model(
-    X: np.ndarray,
-    y: np.ndarray,
+    X_train_df: pd.DataFrame,
+    y_train: np.ndarray,
+    X_test_df: pd.DataFrame,
+    y_test: np.ndarray,
     feature_names: List[str],
     setup: ModelSetup,
     n_splits: int,
@@ -189,15 +199,33 @@ def run_single_model(
     result_dir = RESULTS_DIR / setup.name
     result_dir.mkdir(parents=True, exist_ok=True)
 
+    X_train = X_train_df.to_numpy(dtype=float)
+    X_test = X_test_df.to_numpy(dtype=float)
+    y_train_arr = y_train
+    y_test_arr = y_test
+
     mean_acc, mean_loss, fold_metrics = cross_validate_model(
-        X, y, setup, n_splits=n_splits, random_state=random_state
+        X_train, y_train_arr, setup, n_splits=n_splits, random_state=random_state
     )
     best_idx = int(np.argmax(mean_acc))
     best_param = float(setup.param_values[best_idx])
     best_accuracy = float(mean_acc[best_idx])
     best_log_loss = float(mean_loss[best_idx])
 
-    model = fit_final_model(X, y, setup, best_param)
+    model = fit_final_model(X_train, y_train_arr, setup, best_param)
+
+    train_preds = model.predict(X_train)
+    train_proba = model.predict_proba(X_train)[:, 1]
+    train_proba = np.clip(train_proba, 1e-9, 1 - 1e-9)
+    train_accuracy = float(accuracy_score(y_train_arr, train_preds))
+    train_log_loss = float(log_loss(y_train_arr, train_proba, labels=[0, 1]))
+
+    test_preds = model.predict(X_test)
+    test_proba = model.predict_proba(X_test)[:, 1]
+    test_proba = np.clip(test_proba, 1e-9, 1 - 1e-9)
+    test_accuracy = float(accuracy_score(y_test_arr, test_preds))
+    test_log_loss = float(log_loss(y_test_arr, test_proba, labels=[0, 1]))
+
     result = ModelResult(
         setup=setup,
         mean_accuracy=mean_acc,
@@ -206,6 +234,10 @@ def run_single_model(
         best_param=best_param,
         best_accuracy=best_accuracy,
         best_log_loss=best_log_loss,
+        train_accuracy=train_accuracy,
+        train_log_loss=train_log_loss,
+        test_accuracy=test_accuracy,
+        test_log_loss=test_log_loss,
         model=model,
         feature_names=feature_names,
     )
@@ -216,6 +248,8 @@ def run_single_model(
         f"Best {setup.param_name}={best_param} with mean CV accuracy {best_accuracy:.4f} "
         f"(log-loss {best_log_loss:.4f})"
     )
+    print(f"Train accuracy: {train_accuracy:.4f} | Test accuracy: {test_accuracy:.4f}")
+    print(f"Train log-loss: {train_log_loss:.4f} | Test log-loss: {test_log_loss:.4f}")
 
     metrics_path = save_fold_metrics(result_dir, setup, fold_metrics)
     curve_path = plot_accuracy_curve(result_dir, setup, mean_acc)
@@ -223,19 +257,29 @@ def run_single_model(
     print(f"Saved CV accuracy curve to {curve_path}")
 
     if save_predictions:
-        preds = model.predict(X)
-        proba = model.predict_proba(X)[:, 1]
-        proba = np.clip(proba, 1e-9, 1 - 1e-9)
-        out_df = pd.DataFrame(
+        train_df = pd.DataFrame(
             {
-                "actual": y,
-                "predicted": preds,
-                "proba_chd": proba,
-            }
+                "actual": y_train_arr,
+                "predicted": train_preds,
+                "proba_chd": train_proba,
+            },
+            index=X_train_df.index,
         )
-        predictions_path = result_dir / "predictions.csv"
-        out_df.to_csv(predictions_path, index=True)
-        print(f"Saved fitted predictions to {predictions_path}")
+        train_path = result_dir / "train_predictions.csv"
+        train_df.to_csv(train_path, index=True)
+        print(f"Saved training predictions to {train_path}")
+
+        test_df = pd.DataFrame(
+            {
+                "actual": y_test_arr,
+                "predicted": test_preds,
+                "proba_chd": test_proba,
+            },
+            index=X_test_df.index,
+        )
+        test_path = result_dir / "test_predictions.csv"
+        test_df.to_csv(test_path, index=True)
+        print(f"Saved test predictions to {test_path}")
 
     if inference_df is not None:
         aligned = inference_df.copy()
@@ -327,7 +371,14 @@ def main() -> None:
     df = load_saheart()
     X_df, y = make_design_matrix(df)
     feature_names = X_df.columns.tolist()
-    X = X_df.to_numpy(dtype=float)
+
+    X_train_df, X_test_df, y_train, y_test = train_test_split(
+        X_df,
+        y,
+        test_size=0.1,
+        stratify=y,
+        random_state=args.random_state,
+    )
 
     inference_df = None
     if args.inference_input:
@@ -357,8 +408,10 @@ def main() -> None:
     )
 
     result = run_single_model(
-        X=X,
-        y=y,
+        X_train_df=X_train_df,
+        y_train=y_train,
+        X_test_df=X_test_df,
+        y_test=y_test,
         feature_names=feature_names,
         setup=logistic_setup,
         n_splits=args.folds,

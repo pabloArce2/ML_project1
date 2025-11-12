@@ -1,24 +1,11 @@
 # Ridge Models for LDL and SBP
 
-This directory hosts a ridge-regression study on the SAheart dataset. The script sweeps a
-grid of regularisation strengths (λ) to predict `ldl`, `sbp`, and the joint vector
-`[ldl, sbp]` from the remaining risk factors, logging diagnostics and artefacts for each
-target configuration.
+This directory hosts a ridge-regression study on the SAheart dataset. For each target
+configuration (`ldl_only`, `sbp_only`, and `joint_ldl_sbp`) the script sweeps a grid of
+regularisation strengths (λ), runs 10-fold cross-validation on the training split, and
+evaluates the selected model on a 10% hold-out set to avoid information leakage.
 
-## 1. Targets, Predictors, and Feature Engineering
-
-- **LDL-only model** – Predicts `ldl` from `sbp`, `tobacco`, `adiposity`, `famhist`,
-  `typea`, `obesity`, `alcohol`, and `age`. `sbp` remains a predictor because we only
-  remove the response column.
-- **SBP-only model** – Predicts `sbp` from the same covariates, with `ldl` retained as an
-  explanatory variable.
-- **Joint model** – Predicts both `ldl` and `sbp` simultaneously; both targets are removed
-  from the design matrix and used exclusively as ground-truth outputs.
-
-The categorical attribute `famhist` is expanded with one-of-K coding (baseline dropped)
-and every numeric column is standardised before fitting the ridge model.
-
-## 2. Training Workflow
+## 1. Training Workflow
 
 Run the full sweep with:
 
@@ -33,16 +20,16 @@ python -m linear_regression.run --setting sbp_only
 python -m linear_regression.run --setting ldl_only joint_ldl_sbp
 ```
 
-Adjust the λ grid as needed:
+Adjust the λ grid:
 
 ```bash
 python -m linear_regression.run --lambda-min 1e-5 --lambda-max 1e2 --lambda-count 40
 ```
 
-Use `--save-predictions` to persist training predictions. To score your own feature
+Add `--save-predictions` to persist train/test predictions. To score your own feature
 matrix (already encoded like the training design matrix, e.g. including
-`famhist_Present`), supply it via `--inference-input`. The predictions default to the
-setting’s results folder unless `--inference-output` is provided:
+`famhist_Present`), supply it via `--inference-input`. Predictions default to the
+setting-specific results folder unless `--inference-output` is provided:
 
 ```bash
 python -m linear_regression.run --setting sbp_only \
@@ -50,23 +37,23 @@ python -m linear_regression.run --setting sbp_only \
     --inference-output path/to/predictions.csv
 ```
 
-## 3. Artefacts and Directory Layout
+## 2. Artefacts and Directory Layout
 
-All outputs are stored under `linear_regression/results/<setting>/`. Each setting folder
-contains:
+Outputs live in `linear_regression/results/<setting>/`:
 
-- `lambda_curve.png` – CV MSE vs λ, annotated with the best λ.
-- `cv_errors.csv` – Per-fold MSE for every λ on the grid.
-- `model.joblib` – The fitted `StandardScaler + Ridge` pipeline.
-- `feature_names.json` – Ordered feature list required for inference.
-- `targets.json` – Names of the predicted target columns.
-- `predictions.csv` – Optional training predictions (`--save-predictions`).
-- `custom_inference.csv` – Optional predictions for user-supplied rows.
+- `lambda_curve.png` – mean CV MSE vs λ with the best λ highlighted.
+- `cv_errors.csv` – per-fold MSE for every λ.
+- `model.joblib` – fitted `StandardScaler + Ridge` pipeline.
+- `feature_names.json` – ordered feature list required for inference.
+- `targets.json` – names of the predicted target columns.
+- `train_predictions.csv`, `test_predictions.csv` – optional predictions when `--save-predictions` is used.
+- `custom_inference.csv` – optional predictions for user-supplied rows.
 
-An aggregated `ridge_results.json` is written to `linear_regression/results/` with the λ
-grid, mean errors, per-fold breakdowns, coefficients, and intercepts for each setting.
+An aggregated `ridge_results.json` in `linear_regression/results/` captures the λ grid,
+fold diagnostics, coefficients, intercepts, and both train/test MSE for every target
+setup.
 
-## 4. Manual Inference Playground
+## 3. Manual Inference Playground
 
 Use `inference.py` for quick experiments. Edit `TARGET_SETTING` and `CUSTOM_ROWS`, then
 run:
@@ -76,5 +63,15 @@ python -m linear_regression.inference
 ```
 
 The script loads the stored pipeline and writes the predictions to
-`results/<setting>/manual_inference.csv` (unless you change `OUTPUT_PATH`), so you can
-iterate on scenarios without touching the training driver.
+`results/<setting>/manual_inference.csv` (unless you change `OUTPUT_PATH`).
+
+## 4. Evaluation Summary
+
+Generate consolidated figures and metric tables across regression and classification runs
+with:
+
+```bash
+python -m analysis.visualize_results
+```
+
+By default the script writes figures and CSV summaries to `analysis/output/`.

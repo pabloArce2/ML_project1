@@ -1,0 +1,5 @@
+train_majority_class=0
+train_baseline_accuracy=0.653012
+test_baseline_accuracy=0.659574
+train_positive_count=144
+train_negative_count=271

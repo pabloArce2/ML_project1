@@ -10,7 +10,7 @@ import pandas as pd
 from joblib import dump
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -43,6 +43,8 @@ class ExperimentResult:
     fold_errors: np.ndarray
     best_lambda: float
     best_error: float
+    train_error: float
+    test_error: float
     coefficients: pd.DataFrame
     intercept: pd.Series
     feature_names: List[str]
@@ -59,6 +61,8 @@ class ExperimentResult:
             "fold_errors": self.fold_errors.tolist(),
             "best_lambda": self.best_lambda,
             "best_error": self.best_error,
+            "train_error": self.train_error,
+            "test_error": self.test_error,
             "coefficients": self.coefficients.to_dict(orient="index"),
             "intercept": self.intercept.to_dict(),
             "feature_names": self.feature_names,
@@ -91,7 +95,7 @@ def load_saheart(url: str = DATA_URL) -> pd.DataFrame:
     return df
 
 
-def make_design_matrix(df: pd.DataFrame, target_cols: Sequence[str]) -> Tuple[pd.DataFrame, np.ndarray]:
+def make_design_matrix(df: pd.DataFrame, target_cols: Sequence[str]) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Build the feature matrix for a specific prediction task.
 
@@ -108,10 +112,9 @@ def make_design_matrix(df: pd.DataFrame, target_cols: Sequence[str]) -> Tuple[pd
     X_df = df.drop(columns=list(drop_cols), errors="ignore")
     X_df = pd.get_dummies(X_df, drop_first=True, dtype=float)
 
-    y_df = df[list(target_cols)]
-    y = y_df.values if len(target_cols) > 1 else y_df.values.ravel()
+    y_df = df[list(target_cols)].copy()
 
-    return X_df, y
+    return X_df, y_df
 
 
 def cross_val_ridge(
@@ -247,28 +250,55 @@ def run_single_setup(
     setup: TargetSetup,
     lambdas: np.ndarray,
     n_splits: int = 10,
+    random_state: int = 42,
     save_predictions: bool = False,
     inference_df: Optional[pd.DataFrame] = None,
     inference_output: Optional[Path] = None,
 ) -> ExperimentResult:
-    """Execute cross-validation and final training for one target setting."""
-    X_df, y = make_design_matrix(df, setup.targets)
+    """Execute cross-validation (on the training split) and refit/testing for one target setting."""
+    X_df, y_df = make_design_matrix(df, setup.targets)
     feature_names = X_df.columns.tolist()
-    X = X_df.values.astype(float)
     result_dir = RESULTS_DIR / setup.name
     result_dir.mkdir(parents=True, exist_ok=True)
 
-    mean_errors, fold_errors = cross_val_ridge(X, y, lambdas=lambdas, n_splits=n_splits)
+    X_train_df, X_test_df, y_train_df, y_test_df = train_test_split(
+        X_df,
+        y_df,
+        test_size=0.1,
+        random_state=random_state,
+    )
+
+    X_train = X_train_df.values.astype(float)
+    X_test = X_test_df.values.astype(float)
+    if setup.is_multi_target:
+        y_train = y_train_df.values
+        y_test = y_test_df.values
+    else:
+        y_train = y_train_df.iloc[:, 0].values
+        y_test = y_test_df.iloc[:, 0].values
+
+    mean_errors, fold_errors = cross_val_ridge(
+        X_train, y_train, lambdas=lambdas, n_splits=n_splits, random_state=random_state
+    )
     best_idx = int(np.argmin(mean_errors))
     best_lambda = float(lambdas[best_idx])
     best_error = float(mean_errors[best_idx])
 
     coeffs_df, intercept_series, model = fit_final_model(
-        X=X,
-        y=y,
+        X=X_train,
+        y=y_train,
         alpha=best_lambda,
         feature_names=feature_names,
         targets=setup.targets,
+    )
+
+    train_preds = model.predict(X_train)
+    test_preds = model.predict(X_test)
+    train_error = float(
+        mean_squared_error(y_train, train_preds, multioutput="uniform_average")
+    )
+    test_error = float(
+        mean_squared_error(y_test, test_preds, multioutput="uniform_average")
     )
 
     result = ExperimentResult(
@@ -278,6 +308,8 @@ def run_single_setup(
         fold_errors=fold_errors,
         best_lambda=best_lambda,
         best_error=best_error,
+        train_error=train_error,
+        test_error=test_error,
         coefficients=coeffs_df,
         intercept=intercept_series,
         feature_names=feature_names,
@@ -287,6 +319,7 @@ def run_single_setup(
     print(f"\n=== {setup.name} ===")
     print(setup.description)
     print(f"Average CV MSE (best λ={best_lambda:.4g}): {best_error:.4f}")
+    print(f"Train MSE: {train_error:.4f} | Test MSE: {test_error:.4f}")
     print(describe_top_attributes(result))
 
     # Persist diagnostics
@@ -308,22 +341,29 @@ def run_single_setup(
         json.dump(list(setup.targets), handle, indent=2)
 
     if save_predictions:
-        preds = model.predict(X)
-        if preds.ndim == 1:
-            preds = preds[:, np.newaxis]
-        preds_df = pd.DataFrame(preds, index=X_df.index, columns=setup.targets)
-        actual_df = pd.DataFrame(y, index=X_df.index, columns=setup.targets)
+        def preds_to_df(values: np.ndarray, index: pd.Index) -> pd.DataFrame:
+            array = values if values.ndim == 2 else values.reshape(-1, 1)
+            return pd.DataFrame(array, index=index, columns=list(setup.targets))
 
-        out_df = pd.concat(
-            [
-                actual_df.add_suffix("_actual"),
-                preds_df.add_suffix("_pred"),
-            ],
+        train_actual_df = y_train_df.copy()
+        train_pred_df = preds_to_df(train_preds, train_actual_df.index)
+        train_out = pd.concat(
+            [train_actual_df.add_suffix("_actual"), train_pred_df.add_suffix("_pred")],
             axis=1,
         )
-        predictions_path = result_dir / "predictions.csv"
-        out_df.to_csv(predictions_path, index=True)
-        print(f"Saved predictions to {predictions_path}")
+        train_path = result_dir / "train_predictions.csv"
+        train_out.to_csv(train_path, index=True)
+        print(f"Saved training predictions to {train_path}")
+
+        test_actual_df = y_test_df.copy()
+        test_pred_df = preds_to_df(test_preds, test_actual_df.index)
+        test_out = pd.concat(
+            [test_actual_df.add_suffix("_actual"), test_pred_df.add_suffix("_pred")],
+            axis=1,
+        )
+        test_path = result_dir / "test_predictions.csv"
+        test_out.to_csv(test_path, index=True)
+        print(f"Saved test predictions to {test_path}")
 
     if inference_df is not None:
         inf_features = inference_df.copy()
@@ -355,6 +395,7 @@ def run_experiments(
     selected_setups: Sequence[str],
     lambdas: np.ndarray,
     n_splits: int = 10,
+    random_state: int = 42,
     save_predictions: bool = False,
     inference_df: Optional[pd.DataFrame] = None,
     inference_output: Optional[Path] = None,
@@ -380,6 +421,7 @@ def run_experiments(
             setup,
             lambdas=lambdas,
             n_splits=n_splits,
+            random_state=random_state,
             save_predictions=save_predictions,
             inference_df=inference_df,
             inference_output=inference_output,
@@ -436,6 +478,12 @@ def parse_args() -> argparse.Namespace:
         help="Persist fitted predictions (actual vs. predicted) for each setting to CSV.",
     )
     parser.add_argument(
+        "--random-state",
+        type=int,
+        default=42,
+        help="Seed controlling train/test splitting and cross-validation shuffling.",
+    )
+    parser.add_argument(
         "--inference-input",
         type=str,
         default=None,
@@ -461,6 +509,7 @@ def main() -> None:
         selected_setups=args.setting,
         lambdas=lambdas,
         n_splits=args.folds,
+        random_state=args.random_state,
         save_predictions=args.save_predictions,
         inference_df=inference_df,
         inference_output=inference_output,
