@@ -17,7 +17,7 @@ from sklearn.preprocessing import StandardScaler
 
 DATA_URL = "https://www.hastie.su.domains/Datasets/SAheart.data"
 OUTPUT_DIR = Path(__file__).resolve().parent
-RESULTS_DIR = OUTPUT_DIR / "results"
+RESULTS_DIR = OUTPUT_DIR / "results_joint_test_train"
 
 
 @dataclass
@@ -254,6 +254,7 @@ def run_single_setup(
     save_predictions: bool = False,
     inference_df: Optional[pd.DataFrame] = None,
     inference_output: Optional[Path] = None,
+    use_full_data: bool = False,
 ) -> ExperimentResult:
     """Execute cross-validation (on the training split) and refit/testing for one target setting."""
     X_df, y_df = make_design_matrix(df, setup.targets)
@@ -261,12 +262,19 @@ def run_single_setup(
     result_dir = RESULTS_DIR / setup.name
     result_dir.mkdir(parents=True, exist_ok=True)
 
-    X_train_df, X_test_df, y_train_df, y_test_df = train_test_split(
-        X_df,
-        y_df,
-        test_size=0.1,
-        random_state=random_state,
-    )
+    if use_full_data:
+        X_train_df = X_df.copy()
+        y_train_df = y_df.copy()
+        X_test_df = X_df.copy()
+        y_test_df = y_df.copy()
+        print("Using the full dataset for training and evaluation (no hold-out split).")
+    else:
+        X_train_df, X_test_df, y_train_df, y_test_df = train_test_split(
+            X_df,
+            y_df,
+            test_size=0.1,
+            random_state=random_state,
+        )
 
     X_train = X_train_df.values.astype(float)
     X_test = X_test_df.values.astype(float)
@@ -399,6 +407,7 @@ def run_experiments(
     save_predictions: bool = False,
     inference_df: Optional[pd.DataFrame] = None,
     inference_output: Optional[Path] = None,
+    use_full_data: bool = False,
 ) -> List[ExperimentResult]:
     """Run ridge regression experiments for the requested target settings."""
     setup_lookup = {setup.name: setup for setup in TARGET_SETUPS}
@@ -425,6 +434,7 @@ def run_experiments(
             save_predictions=save_predictions,
             inference_df=inference_df,
             inference_output=inference_output,
+            use_full_data=use_full_data,
         )
         results.append(result)
 
@@ -495,6 +505,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional output path (file or directory) for inference predictions.",
     )
+    parser.add_argument(
+        "--full-data-eval",
+        action="store_true",
+        help="Skip the hold-out split and fit/evaluate on the full dataset (single-level CV only).",
+    )
     return parser.parse_args()
 
 
@@ -513,6 +528,7 @@ def main() -> None:
         save_predictions=args.save_predictions,
         inference_df=inference_df,
         inference_output=inference_output,
+        use_full_data=args.full_data_eval,
     )
 
 
