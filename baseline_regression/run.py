@@ -11,7 +11,6 @@ from joblib import dump
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
 
-# Dataset + paths
 DATA_URL = "https://www.hastie.su.domains/Datasets/SAheart.data"
 OUTPUT_DIR = Path(__file__).resolve().parent
 RESULTS_DIR = OUTPUT_DIR / "results"
@@ -54,7 +53,6 @@ class MeanBaseline:
 
 
 def load_saheart(url: str = DATA_URL) -> pd.DataFrame:
-    # index is an id column
     df = pd.read_csv(url, sep=",", header=0, index_col=0, skipinitialspace=True)
     return df
 
@@ -141,7 +139,6 @@ def run(args: argparse.Namespace) -> None:
     # Per-target result directory
     result_dir = RESULTS_DIR / f"mean_baseline_regression_{target_name}"
 
-    # Plot MSE across folds
     plot_fold_mse(fold_mse, result_dir)
 
     # Save CV metrics
