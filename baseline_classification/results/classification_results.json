@@ -1,0 +1,23 @@
+[
+  {
+    "model": "majority_class_baseline",
+    "description": "Baseline that always predicts the most frequent class in y_train.",
+    "target": "chd",
+    "fold_acc": [
+      0.6382978723404256,
+      0.6382978723404256,
+      0.6521739130434783,
+      0.6521739130434783,
+      0.6304347826086957,
+      0.7391304347826086,
+      0.7391304347826086,
+      0.6521739130434783,
+      0.5434782608695652,
+      0.6521739130434783
+    ],
+    "mean_acc": 0.6537465309898243,
+    "std_acc": 0.055548342988229985,
+    "majority_class": 0,
+    "majority_frac": 0.6536796536796536
+  }
+]
