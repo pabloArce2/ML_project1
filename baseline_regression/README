@@ -1,0 +1,84 @@
+# Baseline Regression (Mean Predictor)
+
+This module implements a **baseline regression** for `ldl` and `sbp`:  
+a model that always predicts the **training mean** of the chosen target and is evaluated with **MSE**.
+
+You can run the baseline for **either target** using `--target ldl` or `--target sbp`.
+
+---
+
+## How to run
+
+### 1) Evaluate the baseline with 10-fold CV and save artefacts
+
+#### LDL
+
+```bash
+python -m baseline_regression.run --target ldl --folds 10 --save-predictions
+```
+
+#### SBP
+
+```bash
+python -m baseline_regression.run --target sbp --folds 10 --save-predictions
+```
+
+This will compute:
+
+- Global mean for the target
+- 10-fold MSE
+- In-sample predictions (if `--save-predictions`)
+- Plots and artefacts
+
+---
+
+### 2) Produce constant predictions for any new CSV
+
+#### LDL baseline on a new file
+
+```bash
+python -m baseline_regression.inference --target ldl --input path/to/rows.csv --output preds.csv
+```
+
+#### SBP baseline on a new file
+
+```bash
+python -m baseline_regression.inference --target sbp --input path/to/rows.csv --output preds.csv
+```
+
+If you omit `--input`, it creates a 1-row dummy example:
+
+```bash
+python -m baseline_regression.inference --target ldl
+```
+
+---
+
+## Outputs
+
+LDL results are stored under:
+
+```
+baseline_regression/results/mean_baseline_regression_ldl/
+```
+
+SBP results are stored under:
+
+```
+baseline_regression/results/mean_baseline_regression_sbp/
+```
+
+Each folder contains:
+
+- **`cv_metrics.csv`** — MSE per fold
+- **`predictions.csv`** — in-sample `actual` vs `predicted` (if `--save-predictions`)
+- **`model.joblib`** — stores the global mean used for prediction
+- **`summary.json`** — mean/std MSE, target name, and learned mean
+- **`baseline_regression_fold_mse.png`** — MSE per fold plot
+
+---
+
+## Notes
+
+- The baseline makes **no use of input features**; it only returns a constant.
+- This serves as a **reference point** to compare against more complex models.
