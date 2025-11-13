@@ -35,7 +35,7 @@ def prepare_features(df: pd.DataFrame, feature_names: List[str]) -> pd.DataFrame
 
 def main():
     parser = argparse.ArgumentParser(description="Classification inference (ANN/LogReg)")
-    parser.add_argument("--setting", default="chd_only")
+    parser.add_argument("--setting", default="chd")
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
