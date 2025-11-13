@@ -17,7 +17,7 @@ from sklearn.preprocessing import StandardScaler
 
 DATA_URL = "https://www.hastie.su.domains/Datasets/SAheart.data"
 OUTPUT_DIR = Path(__file__).resolve().parent
-RESULTS_DIR = OUTPUT_DIR / "results_joint_test_train"
+RESULTS_DIR = OUTPUT_DIR / "results_joint_training_test"
 
 
 @dataclass
@@ -348,11 +348,11 @@ def run_single_setup(
     with targets_path.open("w", encoding="utf-8") as handle:
         json.dump(list(setup.targets), handle, indent=2)
 
-    if save_predictions:
-        def preds_to_df(values: np.ndarray, index: pd.Index) -> pd.DataFrame:
-            array = values if values.ndim == 2 else values.reshape(-1, 1)
-            return pd.DataFrame(array, index=index, columns=list(setup.targets))
+    def preds_to_df(values: np.ndarray, index: pd.Index) -> pd.DataFrame:
+        array = values if values.ndim == 2 else values.reshape(-1, 1)
+        return pd.DataFrame(array, index=index, columns=list(setup.targets))
 
+    if save_predictions:
         train_actual_df = y_train_df.copy()
         train_pred_df = preds_to_df(train_preds, train_actual_df.index)
         train_out = pd.concat(
@@ -372,6 +372,17 @@ def run_single_setup(
         test_path = result_dir / "test_predictions.csv"
         test_out.to_csv(test_path, index=True)
         print(f"Saved test predictions to {test_path}")
+
+    if use_full_data:
+        full_actual_df = y_train_df.copy()
+        full_pred_df = preds_to_df(train_preds, full_actual_df.index)
+        full_out = pd.concat(
+            [full_actual_df.add_suffix("_actual"), full_pred_df.add_suffix("_pred")],
+            axis=1,
+        )
+        full_path = result_dir / "full_data_predictions.csv"
+        full_out.to_csv(full_path, index=True)
+        print(f"Saved full-dataset predictions to {full_path}")
 
     if inference_df is not None:
         inf_features = inference_df.copy()
